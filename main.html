@@ -33,13 +33,12 @@
             cursor: pointer; 
             border-radius: 8px 8px 0 0;
             font-weight: 500;
-            color: #667eea; /* ← НОВЫЙ цвет текста как у градиента фона */
+            color: #667eea;
         }
-
         .tab.active { 
             background: white; 
             box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-            color: #333; /* ← Тёмный цвет только для активной вкладки */
+            color: #333;
         }
         
         .form { display: none; }
@@ -99,7 +98,7 @@
             <button class="tab" onclick="switchTab('register')">Регистрация</button>
         </div>
         
-        <!-- Форма входа: НИК + ПАРОЛЬ -->
+        <!-- Форма входа -->
         <div id="login-form" class="form active">
             <div id="login-success" class="success">✅ Вход успешен! Перенаправление...</div>
             <form id="loginForm">
@@ -107,11 +106,6 @@
                     <label for="loginUsername">Ник</label>
                     <input type="text" id="loginUsername" name="username" required minlength="3">
                     <div class="error" id="loginUsernameError"></div>
-                </div>
-                <div class="form-group">
-                    <label for="loginEmail">Email</label>
-                    <input type="email" id="loginEmail" name="email" required>
-                    <div class="error" id="loginEmailError"></div>
                 </div>
                 <div class="form-group">
                     <label for="loginPassword">Пароль</label>
@@ -122,9 +116,9 @@
             </form>
         </div>
         
-        <!-- Форма регистрации: НИК + EMAIL + ПАРОЛЬ -->
+        <!-- Форма регистрации -->
         <div id="register-form" class="form">
-            <div id="register-success" class="success">✅ Регистрация прошла успешно! Можете войти.</div>
+            <div id="register-success" class="success">✅ Регистрация успешна! Можете войти.</div>
             <form id="registerForm">
                 <div class="form-group">
                     <label for="regUsername">Ник</label>
@@ -138,7 +132,7 @@
                 </div>
                 <div class="form-group">
                     <label for="regPassword">Пароль</label>
-                    <input type="password" id="regPassword" name="password" minlength="6" required>
+                    <input type="password" id="regPassword" name="password" required minlength="6">
                     <div class="error" id="regPasswordError"></div>
                 </div>
                 <div class="form-group">
@@ -152,17 +146,14 @@
     </div>
 
     <script>
-        // Переключение вкладок
         function switchTab(tab) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.form').forEach(f => f.classList.remove('active'));
-            
             event.target.classList.add('active');
             document.getElementById(tab + '-form').classList.add('active');
             clearErrors();
         }
         
-        // Очистка ошибок
         function clearErrors() {
             document.querySelectorAll('.error').forEach(e => {
                 e.classList.remove('show');
@@ -172,7 +163,6 @@
             document.querySelectorAll('.success').forEach(s => s.classList.remove('show'));
         }
         
-        // Показать ошибку
         function showError(fieldId, message) {
             const errorEl = document.getElementById(fieldId + 'Error');
             const inputEl = document.getElementById(fieldId);
@@ -181,78 +171,24 @@
             inputEl.classList.add('error');
         }
         
-        // Валидация формы входа
-        function validateLogin(formData) {
-            clearErrors();
-            let isValid = true;
-            
-            const username = formData.get('username');
-            if (!username || username.length < 3) {
-                showError('loginUsername', 'Ник должен содержать минимум 3 символа');
-                isValid = false;
-            }
-            
-            const email = formData.get('email');
-            if (!email || !email.includes('@')) {
-                showError('loginEmail', 'Введите корректный email');
-                isValid = false;
-            }
-            
-            const password = formData.get('password');
-            if (!password || password.length < 6) {
-                showError('loginPassword', 'Пароль слишком короткий');
-                isValid = false;
-            }
-            
-            return isValid;
-        }
-        
-        // Валидация формы регистрации
-        function validateRegister(formData) {
-            clearErrors();
-            let isValid = true;
-            
-            const username = formData.get('username');
-            if (!username || username.length < 3 || username.length > 20) {
-                showError('regUsername', 'Ник: 3-20 символов');
-                isValid = false;
-            }
-            if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-                showError('regUsername', 'Ник: только буквы, цифры, подчеркивания');
-                isValid = false;
-            }
-            
-            const email = formData.get('email');
-            if (!email || !email.includes('@')) {
-                showError('regEmail', 'Введите корректный email');
-                isValid = false;
-            }
-            
-            const password = formData.get('password');
-            if (!password || password.length < 6) {
-                showError('regPassword', 'Пароль минимум 6 символов');
-                isValid = false;
-            }
-            
-            const passwordConfirm = formData.get('passwordConfirm');
-            if (password !== passwordConfirm) {
-                showError('regPasswordConfirm', 'Пароли не совпадают');
-                isValid = false;
-            }
-            
-            return isValid;
-        }
-        
-        // Отправка запроса
+        // ✅ ИСПРАВЛЕННАЯ функция отправки
         async function submitForm(url, formData) {
             try {
+                // ✅ FormData → URLSearchParams (правильно для Go!)
+                const params = new URLSearchParams(formData);
+                
+                console.log('📤 Отправляем:', params.toString());
+                
                 const response = await fetch(url, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: formData
+                    headers: { 
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: params
                 });
                 
                 const data = await response.json();
+                console.log('📥 Ответ:', data);
                 
                 if (response.ok) {
                     if (url.includes('login')) {
@@ -262,7 +198,6 @@
                         document.getElementById('register-success').classList.add('show');
                     }
                 } else {
-                    // Ошибка от сервера (ник занят, email занят и т.д.)
                     const fieldMap = {
                         'username': url.includes('register') ? 'regUsername' : 'loginUsername',
                         'email': url.includes('register') ? 'regEmail' : 'loginEmail',
@@ -272,11 +207,12 @@
                     showError(fieldMap[errorField] || 'loginUsername', data.message || 'Ошибка');
                 }
             } catch (error) {
+                console.error('❌ Ошибка:', error);
                 showError('loginUsername', 'Ошибка сети');
             }
         }
         
-        // Обработчики форм
+        // Валидация и отправка форм
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
@@ -308,6 +244,56 @@
             btn.disabled = false;
             btn.textContent = 'Зарегистрироваться';
         });
+        
+        function validateLogin(formData) {
+            clearErrors();
+            let isValid = true;
+            
+            const username = formData.get('username');
+            if (!username || username.length < 3) {
+                showError('loginUsername', 'Ник минимум 3 символа');
+                isValid = false;
+            }
+            
+            const password = formData.get('password');
+            if (!password || password.length < 6) {
+                showError('loginPassword', 'Пароль минимум 6 символов');
+                isValid = false;
+            }
+            
+            return isValid;
+        }
+        
+        function validateRegister(formData) {
+            clearErrors();
+            let isValid = true;
+            
+            const username = formData.get('username');
+            if (!username || username.length < 3 || username.length > 20) {
+                showError('regUsername', 'Ник: 3-20 символов');
+                isValid = false;
+            }
+            
+            const email = formData.get('email');
+            if (!email || !email.includes('@')) {
+                showError('regEmail', 'Введите корректный email');
+                isValid = false;
+            }
+            
+            const password = formData.get('password');
+            if (!password || password.length < 6) {
+                showError('regPassword', 'Пароль минимум 6 символов');
+                isValid = false;
+            }
+            
+            const passwordConfirm = formData.get('passwordConfirm');
+            if (password !== passwordConfirm) {
+                showError('regPasswordConfirm', 'Пароли не совпадают');
+                isValid = false;
+            }
+            
+            return isValid;
+        }
     </script>
 </body>
 </html>
