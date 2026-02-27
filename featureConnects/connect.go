@@ -15,7 +15,7 @@ var db *pgxpool.Pool
 
 func InitDB() error {
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, "postgres://user:pass@localhost:5432/YARMARKA_TEXNOLOGY")
+	pool, err := pgxpool.New(ctx, "postgres://user:pass@localhost:5432/YARMARKA_TEXNOLOGY?sslmode=disable")
 	if err != nil {
 		return fmt.Errorf("БД не запустилась: %w", err)
 	}
@@ -86,5 +86,5 @@ func Createtable(ctx context.Context, conn *pgx.Conn) error {
 }
 
 func Checkconnect(ctx context.Context) (*pgx.Conn, error) {
-	return pgx.Connect(ctx, "postgres://postgres:pass@localhost:5432/YARMARKA_TEXNOLOGY")
+	return pgx.Connect(ctx, "postgres://postgres:postgres@localhost:5432/YARMARKA_TEXNOLOGY?sslmode=disable")
 }
