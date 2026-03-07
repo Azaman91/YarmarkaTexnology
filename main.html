@@ -34,6 +34,7 @@
             border-radius: 8px 8px 0 0;
             font-weight: 500;
             color: #667eea;
+            transition: all 0.3s;
         }
         .tab.active { 
             background: white; 
@@ -89,10 +90,34 @@
         }
         button:hover { transform: translateY(-1px); }
         button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+        /* 🔥 НОВОЕ: Секция верификации */
+        .verify-section {
+            text-align: center;
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+        }
+        .code-input {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: center;
+            margin: 1rem 0;
+        }
+        .code-input input {
+            width: 50px;
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- 🔥 Вкладки -->
         <div class="tabs">
             <button class="tab active" onclick="switchTab('login')">Вход</button>
             <button class="tab" onclick="switchTab('register')">Регистрация</button>
@@ -116,10 +141,12 @@
             </form>
         </div>
         
-        <!-- Форма регистрации -->
+        <!-- 🔥 Форма регистрации + верификация -->
         <div id="register-form" class="form">
-            <div id="register-success" class="success">✅ Регистрация успешна! Можете войти.</div>
-            <form id="registerForm">
+            <div id="register-success" class="success">✅ Регистрация успешна!</div>
+            
+            <!-- Обычная форма регистрации -->
+            <form id="registerForm" style="display: block;">
                 <div class="form-group">
                     <label for="regUsername">Ник</label>
                     <input type="text" id="regUsername" name="username" required minlength="3" maxlength="20">
@@ -142,10 +169,30 @@
                 </div>
                 <button type="submit">Зарегистрироваться</button>
             </form>
+
+            <!-- 🔥 Форма ввода кода верификации -->
+            <div id="verify-section" class="verify-section" style="display: none;">
+                <h3>📧 Проверьте почту</h3>
+                <p id="verify-email-display"></p>
+                <p>Введите 6-значный код из письма:</p>
+                <div class="code-input">
+                    <input type="text" maxlength="1" data-index="0">
+                    <input type="text" maxlength="1" data-index="1">
+                    <input type="text" maxlength="1" data-index="2">
+                    <input type="text" maxlength="1" data-index="3">
+                    <input type="text" maxlength="1" data-index="4">
+                    <input type="text" maxlength="1" data-index="5">
+                </div>
+                <div class="error" id="verifyCodeError" style="color: white; background: rgba(255,0,0,0.2);"></div>
+                <button onclick="verifyCode()" style="margin-top: 1rem;">Подтвердить email</button>
+            </div>
         </div>
     </div>
 
     <script>
+        let currentEmail = '';
+
+        // Переключение вкладок
         function switchTab(tab) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.form').forEach(f => f.classList.remove('active'));
@@ -153,7 +200,8 @@
             document.getElementById(tab + '-form').classList.add('active');
             clearErrors();
         }
-        
+
+        // Очистка ошибок
         function clearErrors() {
             document.querySelectorAll('.error').forEach(e => {
                 e.classList.remove('show');
@@ -162,61 +210,123 @@
             document.querySelectorAll('input').forEach(i => i.classList.remove('error'));
             document.querySelectorAll('.success').forEach(s => s.classList.remove('show'));
         }
-        
+
+        // Показать ошибку
         function showError(fieldId, message) {
-            const errorEl = document.getElementById(fieldId + 'Error');
+            const errorEl = document.getElementById(fieldId + 'Error') || document.getElementById('verifyCodeError');
             const inputEl = document.getElementById(fieldId);
-            errorEl.textContent = message;
-            errorEl.classList.add('show');
-            inputEl.classList.add('error');
-        }
-        
-        // ✅ ИСПРАВЛЕННАЯ функция отправки
-       async function submitForm(url, formData) {
-    try {
-        const params = new URLSearchParams(formData);
-        console.log('📤 Отправляем:', params.toString());
-        
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: params
-        });
-        
-        const data = await response.json();
-        console.log('📥 Ответ:', data);
-        
-        if (response.ok) {
-            // 🔥 ОБА случая редиректят на dashboard!
-            if (url.includes('login')) {
-                document.getElementById('login-success').classList.add('show');
-            } else {
-                document.getElementById('register-success').classList.add('show');
+            if (errorEl) {
+                errorEl.textContent = message;
+                errorEl.classList.add('show');
             }
-            // Общий редирект для ЛЮБОЙ успешной операции
-            setTimeout(() => window.location.href = 'http://localhost:8080/dashboard', 1500);
-        } else {
-            const fieldMap = {
-                'username': url.includes('register') ? 'regUsername' : 'loginUsername',
-                'email': url.includes('register') ? 'regEmail' : 'loginEmail',
-                'password': url.includes('register') ? 'regPassword' : 'loginPassword'
-            };
-            const errorField = data.field || 'username';
-            showError(fieldMap[errorField] || 'loginUsername', data.message || 'Ошибка');
+            if (inputEl) inputEl.classList.add('error');
         }
-    } catch (error) {
-        console.error('❌ Ошибка:', error);
-        showError('loginUsername', 'Ошибка сети');
-    }
-}      
-        
-        // Валидация и отправка форм
+
+        // Отправка формы
+        async function submitForm(url, formData) {
+            try {
+                const params = new URLSearchParams(formData);
+                console.log('📤 Отправляем:', params.toString());
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: params
+                });
+                
+                const data = await response.json();
+                console.log('📥 Ответ:', data);
+                
+                if (response.ok) {
+                    if (url.includes('login')) {
+                        document.getElementById('login-success').classList.add('show');
+                        setTimeout(() => window.location.href = 'http://localhost:8080/dashboard', 1500);
+                    } else {
+                        // 🔥 Регистрация успешна → показываем верификацию
+                        currentEmail = data.email || formData.get('email');
+                        document.getElementById('verify-email-display').textContent = currentEmail;
+                        document.getElementById('register-success').classList.add('show');
+                        document.getElementById('registerForm').style.display = 'none';
+                        document.getElementById('verify-section').style.display = 'block';
+                    }
+                } else {
+                    const fieldMap = {
+                        'username': 'regUsername',
+                        'email': 'regEmail',
+                        'password': 'regPassword'
+                    };
+                    const errorField = data.field || 'username';
+                    showError(fieldMap[errorField] || 'regUsername', data.message || 'Ошибка');
+                }
+            } catch (error) {
+                console.error('❌ Ошибка:', error);
+                showError('regUsername', 'Ошибка сети');
+            }
+        }
+
+        // 🔥 Автофокус для кодовых инпутов
+        document.querySelectorAll('.code-input input').forEach((input, index) => {
+            input.addEventListener('input', (e) => {
+                if (e.target.value.length === 1) {
+                    if (index < 5) {
+                        document.querySelectorAll('.code-input input')[index + 1].focus();
+                    } else {
+                        verifyCode(); // Автоверификация
+                    }
+                }
+            });
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Backspace' && e.target.value === '') {
+                    if (index > 0) {
+                        document.querySelectorAll('.code-input input')[index - 1].focus();
+                    }
+                }
+            });
+        });
+
+        // Подтверждение кода
+        async function verifyCode() {
+            const codeInputs = document.querySelectorAll('.code-input input');
+            const code = Array.from(codeInputs).map(input => input.value).join('');
+            
+            if (code.length !== 6) {
+                showError('verifyCode', 'Введите 6 цифр');
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('code', code);
+                formData.append('email', currentEmail);
+                
+                const response = await fetch('http://localhost:8080/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams(formData)
+                });
+                
+                const data = await response.json();
+                if (response.ok) {
+                    document.getElementById('verify-section').innerHTML = `
+                        <div style="background: #4CAF50; color: white; padding: 2rem; border-radius: 12px; text-align: center;">
+                            <h2>✅ ${data.message}</h2>
+                            <p>Теперь можете войти!</p>
+                        </div>
+                    `;
+                    setTimeout(() => window.location.href = 'http://localhost:8080/dashboard', 2000);
+                } else {
+                    showError('verifyCode', data.message || 'Неверный код');
+                    codeInputs[0].focus();
+                }
+            } catch (error) {
+                showError('verifyCode', 'Ошибка сети');
+            }
+        }
+
+        // Формы
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
-            
             if (!validateLogin(formData)) return;
             
             const btn = e.target.querySelector('button');
@@ -228,11 +338,10 @@
             btn.disabled = false;
             btn.textContent = 'Войти';
         });
-        
+
         document.getElementById('registerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
-            
             if (!validateRegister(formData)) return;
             
             const btn = e.target.querySelector('button');
@@ -244,54 +353,47 @@
             btn.disabled = false;
             btn.textContent = 'Зарегистрироваться';
         });
-        
+
+        // Валидация
         function validateLogin(formData) {
             clearErrors();
             let isValid = true;
-            
             const username = formData.get('username');
             if (!username || username.length < 3) {
                 showError('loginUsername', 'Ник минимум 3 символа');
                 isValid = false;
             }
-            
             const password = formData.get('password');
             if (!password || password.length < 6) {
                 showError('loginPassword', 'Пароль минимум 6 символов');
                 isValid = false;
             }
-            
             return isValid;
         }
-        
+
         function validateRegister(formData) {
             clearErrors();
             let isValid = true;
-            
             const username = formData.get('username');
             if (!username || username.length < 3 || username.length > 20) {
                 showError('regUsername', 'Ник: 3-20 символов');
                 isValid = false;
             }
-            
             const email = formData.get('email');
             if (!email || !email.includes('@')) {
                 showError('regEmail', 'Введите корректный email');
                 isValid = false;
             }
-            
             const password = formData.get('password');
             if (!password || password.length < 6) {
                 showError('regPassword', 'Пароль минимум 6 символов');
                 isValid = false;
             }
-            
             const passwordConfirm = formData.get('passwordConfirm');
             if (password !== passwordConfirm) {
                 showError('regPasswordConfirm', 'Пароли не совпадают');
                 isValid = false;
             }
-            
             return isValid;
         }
     </script>
