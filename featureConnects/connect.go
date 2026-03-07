@@ -27,6 +27,11 @@ func InitDB() error {
 }
 
 func Connecthadler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "http://127.0.0.1:5500")
+	if r.Method == "GET" {
+		http.ServeFile(w, r, "register.html")
+		return
+	}
 	if r.Method != "POST" {
 		http.Error(w, `{"error":"Только POST"}`, 405)
 		return
@@ -128,12 +133,22 @@ func Checkconnect(ctx context.Context) (*pgx.Conn, error) {
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "http://127.0.0.1:5500")
+	if r.Method == "GET" {
+		http.ServeFile(w, r, "register.html")
+		return
+	}
 	if r.Method != "POST" {
 		http.Error(w, `{"error":"Только POST"}`, 405)
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		http.Error(w, `{"error":"Ошибка чтения запроса"}`, 400)
+		return
+	}
 	r.Body = io.NopCloser(bytes.NewReader(body))
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, `{"error":"Ошибка парсинга формы"}`, 400)
@@ -157,13 +172,14 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	e := checkLogin(ctx, db, username, password)
 	if e != nil {
+		w.Header().Set("Content-Type", "application/json")
 		http.Error(w, `{"error":"Неверный логин или пароль"}`, 401)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, `{"success":true,"message":"Добро пожаловать!"}`)
+	fmt.Fprint(w, `{"success":true,"redirect":"/dashboard","message":"Добро пожаловать!"}`)
 }
 
 func checkLogin(ctx context.Context, pool *pgxpool.Pool, user, password string) error {
@@ -176,10 +192,13 @@ func checkLogin(ctx context.Context, pool *pgxpool.Pool, user, password string) 
 	var dbPassword []byte
 	err := pool.QueryRow(ctx, sqlQuery, user).Scan(&dbName, &dbPassword)
 	if err == sql.ErrNoRows {
-		return err
+		return fmt.Errorf("пользователь не найден")
+	}
+	if err != nil {
+		return fmt.Errorf("ошибка БД: %w", err)
 	}
 	if err := bcrypt.CompareHashAndPassword(dbPassword, []byte(password)); err != nil {
-		return err
+		return fmt.Errorf("неверный пароль")
 	}
 	return nil
 }

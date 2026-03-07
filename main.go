@@ -23,5 +23,20 @@ func main() {
 
 	fmt.Println("🚀 Сервер: http://localhost:8080")
 	http.HandleFunc("/register", featureconnects.Connecthadler)
+	http.HandleFunc("/login", featureconnects.LoginHandler)
+	http.HandleFunc("/dashboard", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "http://127.0.0.1:5500")
+		fmt.Fprint(w, `
+            <!DOCTYPE html>
+            <html>
+            <head><title>Dashboard</title>
+            <style>body{font-family:sans-serif;padding:2rem;background:#f0f8ff}</style>
+            </head>
+            <body>
+                <h1>Успешный вход!</h1>
+                <p></p>
+                <a href="/register">← Назад</a>
+            </body></html>`)
+	})
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
