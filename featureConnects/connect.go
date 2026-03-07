@@ -3,6 +3,7 @@ package featureconnects
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"fmt"
 	"io"
 	"net/http"
@@ -30,16 +31,10 @@ func Connecthadler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"Только POST"}`, 405)
 		return
 	}
-
-	fmt.Println("📥 Content-Type:", r.Header.Get("Content-Type"))
-	fmt.Println("📥 Content-Length:", r.ContentLength)
-
 	body, _ := io.ReadAll(r.Body)
-	fmt.Println("📦 RAW BODY:", string(body))
 	r.Body = io.NopCloser(bytes.NewReader(body))
 
 	if err := r.ParseForm(); err != nil {
-		fmt.Println("❌ ParseForm error:", err)
 		http.Error(w, `{"error":"Ошибка парсинга формы"}`, 400)
 		return
 	}
@@ -130,4 +125,61 @@ func Createtable(ctx context.Context, conn *pgx.Conn) error {
 
 func Checkconnect(ctx context.Context) (*pgx.Conn, error) {
 	return pgx.Connect(ctx, "postgres://postgres:postgres@localhost:5432/YARMARKA_TEXNOLOGY?sslmode=disable")
+}
+
+func LoginHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, `{"error":"Только POST"}`, 405)
+		return
+	}
+
+	body, _ := io.ReadAll(r.Body)
+	r.Body = io.NopCloser(bytes.NewReader(body))
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, `{"error":"Ошибка парсинга формы"}`, 400)
+		return
+	}
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+	fmt.Println("🟢 Запрос:", username)
+	fmt.Println("🔍 Пароль:", password)
+
+	if username == "" {
+		w.Header().Set("Content-Type", "application/json")
+		http.Error(w, `{"field":"username","message":"Ник пустой"}`, 400)
+		return
+	}
+	if password == "" {
+		w.Header().Set("Content-Type", "application/json")
+		http.Error(w, `{"field":"password","message":"Пароль пустой"}`, 400)
+		return
+	}
+	ctx := context.Background()
+	e := checkLogin(ctx, db, username, password)
+	if e != nil {
+		http.Error(w, `{"error":"Неверный логин или пароль"}`, 401)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprint(w, `{"success":true,"message":"Добро пожаловать!"}`)
+}
+
+func checkLogin(ctx context.Context, pool *pgxpool.Pool, user, password string) error {
+	sqlQuery := `
+	SELECT name, password 
+	FROM users 
+	WHERE name = $1;
+	`
+	var dbName string
+	var dbPassword []byte
+	err := pool.QueryRow(ctx, sqlQuery, user).Scan(&dbName, &dbPassword)
+	if err == sql.ErrNoRows {
+		return err
+	}
+	if err := bcrypt.CompareHashAndPassword(dbPassword, []byte(password)); err != nil {
+		return err
+	}
+	return nil
 }
