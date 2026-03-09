@@ -195,7 +195,7 @@ func RecoverPasswordHandler(w http.ResponseWriter, r *http.Request) {
 	var exists bool
 	err = db.QueryRow(cxt, `SELECT EXISTS(SELECT 1 FROM users WHERE email = $1 AND is_verified = true)`, email).Scan(&exists)
 	if err != nil || !exists {
-		successJSON(w, `{"success":true,"message":"✅ Код отправлен на почту!"}`)
+		jsonError(w, `{"error":"такого email нет в бд"}`, 500)
 		return
 	}
 	code, err := generatePassword()
