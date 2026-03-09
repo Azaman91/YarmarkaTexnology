@@ -144,12 +144,12 @@
             <form id="loginForm">
                 <div class="form-group">
                     <label for="loginUsername">Ник</label>
-                    <input type="text" id="loginUsername" name="username" required minlength="3">
+                    <input type="text" id="loginUsername" name="username" autocomplete="username" required minlength="3">
                     <div class="error" id="loginUsernameError"></div>
                 </div>
                 <div class="form-group">
                     <label for="loginPassword">Пароль</label>
-                    <input type="password" id="loginPassword" name="password" required minlength="6">
+                    <input type="password" id="loginPassword" name="password" autocomplete="current-password" required minlength="6">
                     <div class="error" id="loginPasswordError"></div>
                 </div>
                 <button type="submit">Войти</button>
@@ -165,22 +165,22 @@
             <form id="registerForm">
                 <div class="form-group">
                     <label for="regUsername">Ник</label>
-                    <input type="text" id="regUsername" name="username" required minlength="3" maxlength="20">
+                    <input type="text" id="regUsername" name="username" autocomplete="username" required minlength="3" maxlength="20">
                     <div class="error" id="regUsernameError"></div>
                 </div>
                 <div class="form-group">
                     <label for="regEmail">Email</label>
-                    <input type="email" id="regEmail" name="email" required>
+                    <input type="email" id="regEmail" name="email" autocomplete="email" required>
                     <div class="error" id="regEmailError"></div>
                 </div>
                 <div class="form-group">
                     <label for="regPassword">Пароль</label>
-                    <input type="password" id="regPassword" name="password" required minlength="6">
+                    <input type="password" id="regPassword" name="password" autocomplete="new-password" required minlength="6">
                     <div class="error" id="regPasswordError"></div>
                 </div>
                 <div class="form-group">
                     <label for="regPasswordConfirm">Подтвердите пароль</label>
-                    <input type="password" id="regPasswordConfirm" name="passwordConfirm" required>
+                    <input type="password" id="regPasswordConfirm" name="passwordConfirm" autocomplete="new-password" required>
                     <div class="error" id="regPasswordConfirmError"></div>
                 </div>
                 <button type="submit">Зарегистрироваться</button>
@@ -209,7 +209,7 @@
             <div id="recover-step1">
                 <div class="form-group">
                     <label for="recoverEmail">Email</label>
-                    <input type="email" id="recoverEmail" required>
+                    <input type="email" id="recoverEmail" autocomplete="email" required>
                     <div class="error" id="recoverEmailError"></div>
                 </div>
                 <button onclick="recoverPasswordStep1()">Отправить код</button>
@@ -234,7 +234,7 @@
             <div id="recover-step3" style="display: none;">
                 <div class="form-group">
                     <label for="newPassword">Новый пароль</label>
-                    <input type="password" id="newPassword" required minlength="6">
+                    <input type="password" id="newPassword" autocomplete="new-password" required minlength="6">
                     <div class="error" id="newPasswordError"></div>
                 </div>
                 <button onclick="recoverPasswordStep3()">Сменить пароль</button>
@@ -248,11 +248,25 @@
         let recoverEmail = '';
         let recoverCode = '';
 
-        // ✅ ИСПРАВЛЕННЫЕ ФУНКЦИИ
+        // ✅ ФУНКЦИЯ ВАЛИДАЦИИ ЛОГИНА
+        function validateLogin(formData) {
+            clearErrors();
+            let isValid = true;
+            const username = formData.get('username');
+            if (!username || username.length < 3) {
+                showError('loginUsername', 'Ник минимум 3 символа');
+                isValid = false;
+            }
+            const password = formData.get('password');
+            if (!password || password.length < 6) {
+                showError('loginPassword', 'Пароль минимум 6 символов');
+                isValid = false;
+            }
+            return isValid;
+        }
+
         function showRecoverPassword() {
-            // Скрываем ВСЕ формы
             document.querySelectorAll('.form').forEach(f => f.classList.remove('active'));
-            // Показываем восстановление
             document.getElementById('recover-section').classList.add('active');
             document.getElementById('recoverEmail').focus();
         }
@@ -264,7 +278,6 @@
             clearErrors();
         }
 
-        // Переключение вкладок
         function switchTab(tab) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.form').forEach(f => f.classList.remove('active'));
@@ -278,7 +291,6 @@
             clearErrors();
         }
 
-        // 🔥 АВТОФОКУС КОДОВ (после загрузки)
         document.addEventListener('DOMContentLoaded', function() {
             setupCodeInputs('#verify-section .code-input');
             setupCodeInputs('#recover-step2 .code-input');
@@ -301,12 +313,11 @@
             });
         }
 
-        // Восстановление пароля
         async function recoverPasswordStep1() {
             const email = document.getElementById('recoverEmail').value;
             if (!email) return showError('recoverEmail', 'Введите email');
             
-            console.log('📤 Отправка кода на:', email); // F12 → Console
+            console.log('📤 Отправка кода на:', email);
             
             try {
                 const response = await fetch('http://localhost:8080/recover-password', {
@@ -327,7 +338,7 @@
                     showError('recoverEmail', data.message || 'Ошибка сервера');
                 }
             } catch (error) {
-                console.error('❌ Ошибка:', error); // F12 покажет ошибку
+                console.error('❌ Ошибка:', error);
                 showError('recoverEmail', 'Ошибка сети');
             }
         }
@@ -371,7 +382,6 @@
                 console.log('📥 Ответ бэкенда:', data);
                 
                 if (response.ok) {
-                    // ✅ Успех - показываем зеленую галочку
                     document.getElementById('recover-step3').innerHTML = `
                         <div style="background: #4CAF50; color: white; padding: 2rem; border-radius: 12px; text-align: center;">
                             <h2>✅ ${data.message || 'Пароль успешно изменён'}</h2>
@@ -380,7 +390,6 @@
                     `;
                     setTimeout(() => showLogin(), 2000);
                 } else {
-                    // ❌ Ошибка от бэкенда
                     showError('newPassword', data.message || 'Ошибка смены пароля');
                 }
             } catch (error) {
@@ -389,8 +398,6 @@
             }
         }
 
-
-        // Остальные функции без изменений (clearErrors, showError, формы логина/регистрации)
         function clearErrors() {
             document.querySelectorAll('.error').forEach(e => {
                 e.classList.remove('show');
@@ -410,23 +417,7 @@
             if (inputEl) inputEl.classList.add('error');
         }
 
-        function validateLogin(formData) {
-            clearErrors();
-            let isValid = true;
-            const username = formData.get('username');
-            if (!username || username.length < 3) {
-                showError('loginUsername', 'Ник минимум 3 символа');
-                isValid = false;
-            }
-            const password = formData.get('password');
-            if (!password || password.length < 6) {
-                showError('loginPassword', 'Пароль минимум 6 символов');
-                isValid = false;
-            }
-            return isValid;
-        }
-
-        // ... остальные функции login/register/verify (оставил как было)
+        // ✅ ЛОГИН С РЕДИРЕКТОМ
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
@@ -449,7 +440,6 @@
                 console.log('📥 Ответ:', data);
                 
                 if (response.ok) {
-                    // ✅ ПОКАЗЫВАЕМ УСПЕХ + РЕДИРЕКТ
                     document.getElementById('login-success').classList.add('show');
                     setTimeout(() => {
                         window.location.href = 'http://localhost:8080/dashboard';
