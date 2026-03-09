@@ -25,7 +25,8 @@ func main() {
 	http.HandleFunc("/verify", featureconnects.VerifiryCode)
 	http.HandleFunc("/login", featureconnects.LoginHandler)
 	http.HandleFunc("/dashboard", dashboardHandler)
-
+	http.HandleFunc("/recover-password", featureconnects.RecoverPasswordHandler)
+	http.HandleFunc("/change-password", featureconnects.ChangePasswordHandler)
 	fmt.Println("🚀 http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }

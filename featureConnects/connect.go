@@ -172,6 +172,89 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	successJSON(w, `{"success":true,"redirect":"http://localhost:8080/dashboard","message":"Добро пожаловать!"}`)
 }
+func RecoverPasswordHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "http://127.0.0.1:5500")
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		jsonError(w, `{"error":"Ошибка чтения"}`, 400)
+		return
+	}
+	r.Body = io.NopCloser(bytes.NewReader(body))
+
+	if err := r.ParseForm(); err != nil {
+		jsonError(w, `{"error":"Ошибка парсинга"}`, 400)
+		return
+	}
+	email := r.FormValue("email")
+	if email == "" {
+		jsonError(w, `{"error":"Заполните email"}`, 400)
+		return
+	}
+	cxt := context.Background()
+	var exists bool
+	err = db.QueryRow(cxt, `SELECT EXISTS(SELECT 1 FROM users WHERE email = $1 AND is_verified = true)`, email).Scan(&exists)
+	if err != nil || !exists {
+		successJSON(w, `{"success":true,"message":"✅ Код отправлен на почту!"}`)
+		return
+	}
+	code, err := generatePassword()
+	if err != nil {
+		jsonError(w, `{"error":"Ошибка генерации пароля"}`, 500)
+		return
+	}
+
+	_, err = db.Exec(cxt, `UPDATE users SET verification_code = $1 WHERE email = $2`, code, email)
+	if err != nil {
+		fmt.Println("❌ DB Error:", err)
+		jsonError(w, `{"error":"Ошибка БД"}`, 500)
+		return
+	}
+	go PasswordSendEmail(email, code)
+
+	successJSON(w, fmt.Sprintf(`{"success":true,"message":"✅ Код отправлен на %s!"}`, email))
+}
+
+func ChangePasswordHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "http://127.0.0.1:5500")
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		jsonError(w, `{"error":"Ошибка чтения"}`, 400)
+		return
+	}
+	r.Body = io.NopCloser(bytes.NewReader(body))
+	if err := r.ParseForm(); err != nil {
+		jsonError(w, `{"error":"Ошибка парсинга"}`, 400)
+		return
+	}
+
+	email := r.FormValue("email")
+	password := r.FormValue("password")
+	if email == "" || password == "" {
+		jsonError(w, `{"error":"Заполнение данных"}`, 400)
+		return
+	}
+	ctx := context.Background()
+
+	var exists bool
+	err = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE email = $1 AND is_verified = true)`, email).Scan(&exists)
+	if err != nil || !exists {
+		jsonError(w, `{"error":"Заполнение БД или неверная почта"}`, 500)
+		return
+	}
+	h, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		jsonError(w, `{"error":"Ошибка шифрования"}`, 400)
+		return
+	}
+	_, err = db.Exec(ctx, `UPDATE users SET password = $1 WHERE email = $2`, h, email)
+	if err != nil {
+		fmt.Println("❌ DB Error:", err)
+		jsonError(w, `{"error":"Ошибка БД"}`, 500)
+		return
+	}
+	successJSON(w, `{"success":true,"message":"✅ Пароль изменён! Можете войти."}`)
+}
 
 func checkLogin(ctx context.Context, pool *pgxpool.Pool, user, password string) error {
 	var dbName string
@@ -264,6 +347,37 @@ Content-Type: text/html; charset=UTF-8
     <p style="color: #666; font-size: 0.9em;">YARMARKA_TEXNOLOGY Auth Service</p>
 </body>
 </html>`,
+		"YARMARKA_TEXNOLOGY", from, email, code))
+
+	// ✅ TLS + Gmail SMTP
+	auth := smtp.PlainAuth("", from, pass, "smtp.gmail.com")
+
+	// Подключение с TLS
+	return smtp.SendMail("smtp.gmail.com:587", auth, from, []string{email}, msg)
+}
+
+func PasswordSendEmail(email, code string) error {
+	from := "artemprudnikov23@gmail.com"
+	pass := "wpwgxiqkfrywzrci"
+
+	// ✅ ПРАВИЛЬНЫЙ формат письма
+	msg := []byte(fmt.Sprintf(`From: %s <%s>
+To: %s
+Subject: 🔒 Восстановление пароля YARMARKA_TEXNOLOGY
+MIME-Version: 1.0
+Content-Type: text/html; charset=UTF-8
+
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    <h2 style="color: #ff6b6b;">🔒 Восстановление пароля</h2>
+    <p>Ваш код для сброса пароля:</p>
+    <h1 style="background: #ff6b6b; color: white; padding: 20px; text-align: center; 
+                font-size: 2.5em; letter-spacing: 10px; margin: 20px 0;">%s</h1>
+    <p><strong>Действителен 10 минут</strong></p>
+    <hr style="border: none; height: 1px; background: #eee;">
+    <p style="color: #666; font-size: 0.9em;">YARMARKA_TEXNOLOGY Auth Service</p>
+</body></html>`,
 		"YARMARKA_TEXNOLOGY", from, email, code))
 
 	// ✅ TLS + Gmail SMTP
